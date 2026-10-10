@@ -1,0 +1,84 @@
+{
+  "recorded": "2026-10-01",
+  "python": "3.12.10",
+  "cases": {
+    "startup": {
+      "median": 702.4,
+      "min": 639.4,
+      "unit": "ms",
+      "detail": "398 modules imported",
+      "runs": 3
+    },
+    "page_cycle": {
+      "median": 15.996086666806756,
+      "min": 15.922906666673953,
+      "unit": "ms/op",
+      "detail": "open then close, 15 cycles",
+      "runs": 3
+    },
+    "evaluate": {
+      "median": 0.05202540000027511,
+      "min": 0.0515730999999505,
+      "unit": "ms/op",
+      "detail": "evaluate('1')",
+      "runs": 3
+    },
+    "host_call": {
+      "median": 91.4693000013358,
+      "min": 88.61610000167275,
+      "unit": "ms",
+      "detail": "20000 setAttribute calls",
+      "runs": 3
+    },
+    "js_loop": {
+      "median": 2.1178999995754566,
+      "min": 1.8616000015754253,
+      "unit": "ms",
+      "detail": "20000 additions, no host call",
+      "runs": 3
+    },
+    "dom_build": {
+      "median": 332.20520000031684,
+      "min": 331.44259999971837,
+      "unit": "ms",
+      "detail": "4000 divs with a span each",
+      "runs": 3
+    },
+    "dom_parse": {
+      "median": 886.8390999996336,
+      "min": 799.6095000016794,
+      "unit": "ms",
+      "detail": "4000 rows",
+      "runs": 3
+    },
+    "dom_query": {
+      "median": 3470.607100000052,
+      "min": 3441.093000001274,
+      "unit": "ms",
+      "detail": "200 scans of a 4000-row tree",
+      "runs": 3
+    },
+    "event_dispatch": {
+      "median": 2299.5814999994764,
+      "min": 2290.483900000254,
+      "unit": "ms",
+      "detail": "20000 dispatches through one listener",
+      "runs": 3
+    },
+    "resource_batch": {
+      "median": 144.5114999987709,
+      "min": 133.65390000035404,
+      "unit": "ms",
+      "detail": "200 images",
+      "runs": 3
+    },
+    "resident_pages": {
+      "median": 1.40869140625,
+      "min": 1.23193359375,
+      "unit": "MB/page",
+      "detail": "8 live pages, 1 python handles each",
+      "runs": 3
+    }
+  },
+  "unavailable": {}
+}
