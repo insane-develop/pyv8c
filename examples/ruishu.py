@@ -11,7 +11,7 @@ def run(page, url):
     res = page.net.get(url)
     # res = page.net.fetch(url)
     # res = page.net.xhr(url)
-    # print(res.text)
+    print(res.text)
     logger.info(f"res: {res.status}, {len(res.text)}")
 
 

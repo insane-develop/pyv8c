@@ -1,7 +1,12 @@
 import time
 from pathlib import Path
-
+import sys
 from loguru import logger
+
+
+HERE = Path(__file__).resolve().parent
+WORKSPACE = HERE.parents[2]
+sys.path[:0] = [str(WORKSPACE / '_pyv8'), str(WORKSPACE / 'pyv8c')]
 from pyv8c import Browser
 
 logger.add("akm.log", level="DEBUG", mode='w')
@@ -48,7 +53,7 @@ if "__main__" == __name__:
         # trace=True, traceable=True,
         resource_interceptor=intercept,
         # idl_path=Path(__file__).parent.parent.parent.joinpath("idls/145.0.7632.162.zip"),   # 换一份 IDL 文档；默认读包内 idl/idl.zip
-        proxy="http://127.0.0.1:7890",    
+        proxy="http://127.0.0.1:6696",
         http_engine='curl_cffi', http_options={"impersonate": "chrome150"},
         threaded_loaders=True,
     )
