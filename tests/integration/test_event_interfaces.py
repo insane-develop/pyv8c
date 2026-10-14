@@ -76,7 +76,7 @@ def test_pointer_and_wheel_events_extend_mouse_event(event_page):
     """) == [True, True,
              7, "touch", 0.25, 12, 8, True, 3,
              0, 1, 0, 0,
-             0.5,
+             0,
              True, True,
              120, 0, -120, 4]
 

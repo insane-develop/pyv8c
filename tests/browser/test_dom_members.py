@@ -6,6 +6,7 @@ stylesheet tests guard the cascade entry points that keep ``layout`` from
 rescanning the document on every read.
 """
 import json
+import time
 
 import pytest
 from loguru import logger
@@ -205,7 +206,15 @@ def test_a_frames_window_keeps_its_identity_across_a_navigation(page):
         window.__saved = document.getElementById('f').contentWindow;
         return window.__saved === document.getElementById('f').contentWindow;
     })()""") is True
-    page.evaluate("document.getElementById('f').srcdoc = '<p>second</p>'")
+    page.evaluate("""window.__frameLoaded = false;
+        document.getElementById('f').onload = () => { window.__frameLoaded = true; };
+        document.getElementById('f').srcdoc = '<p>second</p>';""")
+    # srcdoc navigation completes asynchronously; check identity after its load,
+    # rather than racing the frame's document replacement on the next command.
+    deadline = time.monotonic() + 2
+    while not page.evaluate("window.__frameLoaded") and time.monotonic() < deadline:
+        time.sleep(.01)
+    assert page.evaluate("window.__frameLoaded") is True
     assert page.evaluate("""(() => {
         const frame = document.getElementById('f');
         return [window.__saved === frame.contentWindow,

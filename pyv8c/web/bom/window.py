@@ -56,7 +56,7 @@ _CONVERSION_FAILURES = frozenset({
 })
 
 
-def _string_argument(value, member):
+def _string_argument(value, member, interface_name="Window"):
     """A ``DOMString`` argument worded as WebIDL words it; an exception a
     caller's own ``toString`` threw is passed through untouched.
     """
@@ -67,7 +67,25 @@ def _string_argument(value, member):
         reason = str(original._get("message")) if isinstance(original, pyv8.JSObject) else ""
         if reason not in _CONVERSION_FAILURES:
             raise
-        raise PageTypeError(f"Failed to execute '{member}' on 'Window': {reason}") from None
+        raise PageTypeError(f"Failed to execute '{member}' on '{interface_name}': {reason}") from None
+
+
+def base64_like(interface_name, member, data):
+    """The shared WindowOrWorkerGlobalScope base64 algorithms."""
+    if data is MISSING:
+        raise missing_error(interface_name, member, 1, 0, constructor=False)
+    text = _string_argument(data, member, interface_name)
+    action = "decoded" if member == "atob" else "encoded"
+    prefix = f"Failed to execute '{member}' on '{interface_name}': "
+    if any(ord(character) > 0xFF for character in text):
+        raise InvalidCharacterError(prefix + f"The string to be {action} contains"
+                                    " characters outside of the Latin1 range.")
+    if member == "btoa":
+        return forgiving_base64_encode(text)
+    decoded = forgiving_base64_decode(text)
+    if decoded is None:
+        raise InvalidCharacterError(prefix + "The string to be decoded is not correctly encoded.")
+    return decoded
 
 
 #: Names WindowProxy exposes to a cross-origin caller; the table lives here for both.
@@ -641,30 +659,13 @@ class Window(_SchedulingMixin, WindowProperties):
         return fetch_like(self._services, "Window", request, options)
 
     def fn_atob(self, data=MISSING, *_extra):
-        if data is MISSING:
-            raise missing_error("Window", "atob", 1, 0, constructor=False)
-        # Chrome takes the argument as Latin1 before it decodes anything, and says so.
-        text = _string_argument(data, "atob")
-        if any(ord(character) > 0xFF for character in text):
-            raise InvalidCharacterError(
-                "Failed to execute 'atob' on 'Window': The string to be decoded contains"
-                " characters outside of the Latin1 range.")
-        decoded = forgiving_base64_decode(text)
-        if decoded is None:
-            raise InvalidCharacterError(
-                "Failed to execute 'atob' on 'Window': The string to be decoded is not"
-                " correctly encoded.")
-        return decoded
+        return base64_like("Window", "atob", data)
 
     def fn_btoa(self, data=MISSING, *_extra):
-        if data is MISSING:
-            raise missing_error("Window", "btoa", 1, 0, constructor=False)
-        text = _string_argument(data, "btoa")
-        if any(ord(character) > 0xFF for character in text):
-            raise InvalidCharacterError(
-                "Failed to execute 'btoa' on 'Window': The string to be encoded contains"
-                " characters outside of the Latin1 range.")
-        return forgiving_base64_encode(text)
+        return base64_like("Window", "btoa", data)
+    def fn_structuredClone(self, value=MISSING, options=None, *_extra):
+        from ..fetch.clone import clone_api
+        return clone_api(self, "Window", value, options)
 
     def fn_close(self, *_extra): return None
     def fn_focus(self, *_extra): return None

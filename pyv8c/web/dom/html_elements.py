@@ -485,7 +485,16 @@ class Element(_ParentNodeMixin, _ChildNodeMixin, _NonDocumentTypeChildNodeMixin,
         if self.localName in _VOID_ELEMENTS:
             return f"<{self.localName}{attrs}>"
         return f"<{self.localName}{attrs}>{self.get_innerHTML()}</{self.localName}>"
-    def _clone_shallow(self): return type(self)(self.localName, services=self._services, attributes=self.attributes.copy(),)
+    def _clone_shallow(self):
+        options = dict(services=self._services, attributes=self.attributes.copy(),
+                       namespace=self._namespace, prefix=self._prefix, local_name=self.localName)
+        # Baseline-only SVG classes have a placeholder constructor. As in
+        # Document.createElementNS, initialize their inherited Element model directly.
+        if getattr(type(self), '__v8_idl_stub__', False):
+            clone = type(self).__new__(type(self))
+            Element.__init__(clone, self.nodeName, **options)
+            return clone
+        return type(self)(self.nodeName, **options)
 
     # A click runs the behavior of the nearest ancestor that has one (see
     # dom.activation); most elements have none, hence the default pair below.
@@ -1032,6 +1041,11 @@ class HTMLScriptElement(HTMLElement):
             "setter": "set_textContent"
         }
     }
+    def _clone_shallow(self):
+        clone = super()._clone_shallow()
+        # HTML script cloning carries its already executed state to the clone.
+        clone._script_executed = getattr(self, "_script_executed", False)
+        return clone
     def get_src(self): return _url_value(self, "src")
     def set_src(self, value): _set_url_value(self, "src", value)
     def get_type(self): return self.attributes.get("type", "")

@@ -86,7 +86,7 @@ CORE_INTERFACES = (
     "PerformanceMeasure", "PerformanceResourceTiming", "PerformanceNavigationTiming",
     "PerformanceObserverEntryList",
     "Lock", "LockManager",
-    "SVGElement", "SVGGraphicsElement", "SVGGeometryElement", "SVGRectElement",
+    "SVGElement", "SVGGraphicsElement", "SVGGeometryElement", "SVGRectElement", "SVGRect",
     "SVGLength", "SVGAnimatedLength",
     "DOMStringList",
     "AbortController", "AbortSignal",

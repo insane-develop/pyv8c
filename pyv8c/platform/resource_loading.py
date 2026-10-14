@@ -1129,7 +1129,14 @@ class ResourceController:
             return iframe._child_services
         markup = iframe.attributes.get("srcdoc")
         if markup is not None:
-            return self.load_iframe_markup(iframe, str(markup))
+            if pyv8.current_context() is None:
+                return self.load_iframe_markup(iframe, str(markup))
+            # Insertion exposes the initial about:blank window synchronously;
+            # srcdoc navigation runs later, rather than parsing inside its caller.
+            child = self._child_frame_page(iframe, "about:blank")
+            self.page.tasks.post(lambda: self.load_iframe_markup(iframe, str(markup))
+                                 if iframe._is_connected() else None)
+            return child
         page = self.page
         child = self._child_frame_page(iframe, "about:blank")
         # With a URL or srcdoc the initial about:blank is replaced by the same

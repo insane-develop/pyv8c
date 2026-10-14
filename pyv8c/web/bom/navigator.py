@@ -1123,6 +1123,9 @@ class Navigator:
         return self._features.value("managed") if self._secure() else pyv8.Undefined
     def fn_javaEnabled(self, *_extra):
         return pyv8.Undefined if self._worker else False
+    def fn_getGamepads(self, *_extra):
+        """The four empty controller slots Chrome reports without attached hardware."""
+        return pyv8.Undefined if self._worker else [pyv8.Null] * 4
     def fn_getBattery(self, *_extra):
         battery = self._features.value("battery")
         realm = getattr(self._services, "realm_services", None)

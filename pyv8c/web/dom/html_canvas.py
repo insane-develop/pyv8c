@@ -92,6 +92,7 @@ class ImageData:
     def get_height(self): return self._height
     def get_data(self): return self._data
     def get_colorSpace(self): return "srgb"
+    def get_pixelFormat(self): return "rgba-unorm8"
 
 
 @interface('CanvasRenderingContext2D', None)
@@ -110,6 +111,11 @@ class CanvasRenderingContext2D:
             self._image = Image.new("RGBA", (canvas._width, canvas._height), (0, 0, 0, 0))
             self._draw = ImageDraw.Draw(self._image)
         except ImportError: self._image = self._draw = None
+    def fn_getContextAttributes(self, *_):
+        """Describe this renderer's RGBA8 surface and its default drawing policy."""
+        return {"alpha": True, "colorSpace": "srgb", "colorType": "unorm8",
+                "desynchronized": False, "toneMapping": {"mode": "standard"},
+                "willReadFrequently": False}
     def _reset(self):
         if self._image is not None:
             from PIL import Image, ImageDraw

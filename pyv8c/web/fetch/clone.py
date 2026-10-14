@@ -502,3 +502,66 @@ def structured_clone(value, context=None):
         raise DataCloneError(f"The object of type {type(item).__name__!r} could not be cloned")
 
     return clone(value)
+
+
+_CLONE_API = r'''(value, transfer) => {
+  const seen=new Map(), transferred=new Set();
+  const fail=()=>{throw new DOMException('The object could not be cloned.','DataCloneError')};
+  for(const buffer of transfer){
+    if(Object.prototype.toString.call(buffer)!=='[object ArrayBuffer]' || buffer.detached || transferred.has(buffer))fail();
+    transferred.add(buffer);
+  }
+  function copy(value){
+    if(typeof value==='function' || typeof value==='symbol')fail();
+    if(value===null || typeof value!=='object')return value;
+    if(seen.has(value))return seen.get(value);
+    const tag=Object.prototype.toString.call(value);
+    let result;
+    if(tag==='[object ArrayBuffer]'){
+      if(value.detached)fail();result=ArrayBuffer.prototype.slice.call(value,0);
+    }else if(ArrayBuffer.isView(value)){
+      const buffer=copy(value.buffer);
+      result=tag==='[object DataView]'?new DataView(buffer,value.byteOffset,value.byteLength):
+        new globalThis[tag.slice(8,-1)](buffer,value.byteOffset,value.length);
+    }else if(tag==='[object Date]')result=new Date(Date.prototype.getTime.call(value));
+    else if(tag==='[object RegExp]')result=new RegExp(value.source,value.flags);
+    else if(tag==='[object Map]'){
+      result=new Map();seen.set(value,result);
+      for(const [key,item] of Map.prototype.entries.call(value))result.set(copy(key),copy(item));return result;
+    }else if(tag==='[object Set]'){
+      result=new Set();seen.set(value,result);
+      for(const item of Set.prototype.values.call(value))result.add(copy(item));return result;
+    }else if(tag==='[object Object]' || Array.isArray(value)){
+      result=Array.isArray(value)?new Array(value.length):{};seen.set(value,result);
+      for(const key of Object.keys(value))Object.defineProperty(result,key,{value:copy(value[key]),writable:true,enumerable:true,configurable:true});
+      return result;
+    }else if(tag==='[object Error]'){
+      const Constructor=['Error','EvalError','RangeError','ReferenceError','SyntaxError','TypeError','URIError'].includes(value.name)?globalThis[value.name]:Error;
+      result=new Constructor(value.message);seen.set(value,result);
+      if(typeof value.stack==='string')result.stack=value.stack;
+      if(Object.hasOwn(value,'cause'))result.cause=copy(value.cause);
+    }else if(tag==='[object DOMException]')result=new DOMException(value.message,value.name);
+    else if(tag==='[object Blob]')result=value.slice(0,value.size,value.type);
+    else if(tag==='[object File]')result=new File([value],value.name,{type:value.type,lastModified:value.lastModified});
+    else if(['[object Boolean]','[object Number]','[object String]','[object BigInt]'].includes(tag))result=Object(value.valueOf());
+    else fail();
+    seen.set(value,result);return result;
+  }
+  const result=copy(value);
+  for(const buffer of transferred)buffer.transfer();
+  return result;
+}'''
+
+
+def clone_api(scope, interface_name, value, options):
+    """Clone in the calling global's own realm, retaining cycles and buffer aliases."""
+    from ...foundation.arguments import missing_error
+    if value is MISSING:
+        raise missing_error(interface_name, 'structuredClone', 1, 0, constructor=False)
+    settings=dictionary(options,name='StructuredSerializeOptions',
+                        prefix=f"Failed to execute 'structuredClone' on '{interface_name}': ")
+    transfer=sequence(settings.get('transfer',()))
+    function=getattr(scope,'_structured_clone_function',None)
+    if function is None:
+        function=scope._structured_clone_function=scope._services.realm_services.evaluate_script(_CLONE_API)
+    return function.call(None,value,transfer)

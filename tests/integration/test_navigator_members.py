@@ -11,6 +11,18 @@ MEMBERS = ("mediaDevices", "permissions", "mediaSession", "serviceWorker", "cred
            "bluetooth", "storage")
 
 
+def test_gamepads_without_connected_hardware_are_null_slots():
+    browser = Browser(real_network=False)
+    try:
+        page = browser.new_context().new_page()
+        page.set_content('<body></body>', url='https://secure.test/')
+        assert page.evaluate('''(()=>{const first=navigator.getGamepads();
+            first[0]='changed';return [navigator.getGamepads().length,
+              navigator.getGamepads().every(value=>value===null)];})()''') == [4, True]
+    finally:
+        browser.close()
+
+
 def _settled(page, expression, *, name="__settled"):
     """What *expression*'s promise settles as: a value, or an error's name."""
     page.evaluate(

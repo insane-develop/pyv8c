@@ -55,29 +55,55 @@ def run_activation(node, event=None):
     return True
 
 
+def prepare_activation(node):
+    """Checkbox legacy pre-activation: listeners see the new checked state."""
+    target = activation_target(node)
+    if (target is None or getattr(target, "localName", "") != "input"
+            or target.get_type() != "checkbox" or is_disabled_form_control(target)):
+        return None
+    before = (target, target._checked, target._indeterminate)
+    target._dirty_checked = True
+    target._checked = not target._checked
+    target._indeterminate = False
+    return before
+
+
+def complete_activation(node, event, prepared):
+    """Cancellation restores checkedness and indeterminate, while remaining dirty."""
+    if event is None or event.defaultPrevented:
+        if prepared is not None:
+            target, checked, indeterminate = prepared
+            target._checked, target._indeterminate = checked, indeterminate
+        return False
+    if prepared is not None:
+        event._activation_prepared = prepared[0]
+    return run_activation(node, event)
+
+
 def click_element(element):
     """The activation steps ``element.click()`` runs: an untrusted ``click`` with
     ``detail`` 0, then the behavior unless it was cancelled."""
     if not accepts_mouse_events(element):
         return False
-    from .events import MouseEvent
+    from .events import PointerEvent
     #: A click a script makes is not a user's, so Chrome reports ``isTrusted`` false here --
     #: the one event the engine raises that stays untrusted.
-    event = MouseEvent("click", {"composed": True,
+    event = PointerEvent("click", {"composed": True,
         "bubbles": True, "cancelable": True, "detail": 0,
         "button": 0, "buttons": 0, "clientX": 0, "clientY": 0,
+        "pointerId": -1, "pointerType": "", "isPrimary": False, "pressure": 0,
     })
+    prepared = prepare_activation(element)
     element.fn_dispatchEvent(event)
-    if not event.defaultPrevented:
-        run_activation(element, event)
+    complete_activation(element, event, prepared)
     return True
 
 
 def repeat_click(element, source):
     """Run a click on *element* that repeats *source* -- same coordinates, click
     count and trust -- as a label forwards its press to the control."""
-    from .events import MouseEvent
-    repeated = MouseEvent("click", {"composed": True,
+    from .events import PointerEvent
+    repeated = PointerEvent("click", {"composed": True,
         "isTrusted": getattr(source, "isTrusted", False),
         "bubbles": True, "cancelable": True,
         "detail": getattr(source, "detail", 0),
@@ -85,14 +111,22 @@ def repeat_click(element, source):
         "buttons": 0,
         "clientX": getattr(source, "clientX", 0),
         "clientY": getattr(source, "clientY", 0),
+        "screenX": getattr(source, "screenX", 0),
+        "screenY": getattr(source, "screenY", 0),
+        "pointerId": getattr(source, "pointerId", -1),
+        "pointerType": getattr(source, "pointerType", ""),
+        "isPrimary": getattr(source, "isPrimary", False),
+        "pressure": getattr(source, "pressure", 0),
+        "width": getattr(source, "width", 1), "height": getattr(source, "height", 1),
     })
     repeated._trusted = bool(getattr(source, "_trusted", False))
+    prepared = prepare_activation(element)
     element.fn_dispatchEvent(repeated)
-    if not repeated.defaultPrevented:
-        run_activation(element, repeated)
+    complete_activation(element, repeated, prepared)
     return True
 
 __all__ = [
     "accepts_mouse_events", "activation_target", "click_element",
     "is_disabled_form_control", "repeat_click", "run_activation", "user_activated",
+    "prepare_activation", "complete_activation",
 ]

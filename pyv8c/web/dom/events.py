@@ -1,5 +1,6 @@
 """DOM event model: events, event-handler slots and the target dispatch pipeline."""
 import time
+import math
 
 import pyv8
 from ...idl import interface
@@ -119,6 +120,7 @@ class Event:
         self._non_propagating = False
     def get_type(self): return self.type
     def get_target(self): return self.target or pyv8.Null
+    def get_srcElement(self): return self.get_target()
     def get_currentTarget(self): return self.currentTarget or pyv8.Null
     def get_bubbles(self): return self.bubbles
     def get_cancelable(self): return self.cancelable
@@ -217,6 +219,21 @@ class MouseEvent(UIEvent):
     def get_y(self): return self.y
     def get_offsetX(self): return self.offsetX
     def get_offsetY(self): return self.offsetY
+    def _layer_coordinates(self):
+        """Layer-relative coordinates use the nearest positioned ancestor's origin."""
+        from .layout import computed_style, positioned_box
+        node = self.target
+        while node is not None:
+            if getattr(node, 'nodeType', None) == 1:
+                style = computed_style(node)
+                if style.get('position', 'static') != 'static':
+                    box = positioned_box(node)
+                    return int(self.clientX-box.left), int(self.clientY-box.top)
+            parent = getattr(node, 'parentNode', None)
+            node = parent if parent is not None else getattr(node, '_host', None)
+        return int(self._document_x), int(self._document_y)
+    def get_layerX(self): return self._layer_coordinates()[0]
+    def get_layerY(self): return self._layer_coordinates()[1]
     def get_movementX(self): return self.movementX
     def get_movementY(self): return self.movementY
     def get_ctrlKey(self): return self.ctrlKey
@@ -347,11 +364,11 @@ class PointerEvent(MouseEvent):
         self.pointerId = integer(init.get("pointerId", 0), signed=True)
         self.width = number(init.get("width", 1))
         self.height = number(init.get("height", 1))
-        self.pressure = number(init.get("pressure", 0.5))
+        self.pressure = number(init.get("pressure", 0))
         self.tiltX = integer(init.get("tiltX", 0), signed=True)
         self.tiltY = integer(init.get("tiltY", 0), signed=True)
         self.azimuthAngle = number(init.get("azimuthAngle", 0))
-        self.altitudeAngle = number(init.get("altitudeAngle", 0))
+        self.altitudeAngle = number(init.get("altitudeAngle", math.pi / 2))
         self.tangentialPressure = number(init.get("tangentialPressure", 0))
         self.twist = integer(init.get("twist", 0), signed=True)
         self.pointerType = dom_string(init.get("pointerType", ""))

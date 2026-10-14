@@ -31,7 +31,7 @@ import time
 import pyv8
 
 from ..foundation.host_errors import HostStateError
-from ..web.dom.activation import accepts_mouse_events, run_activation
+from ..web.dom.activation import accepts_mouse_events, prepare_activation, complete_activation
 from ..web.dom.focus import focus_on_mousedown
 from ..web.dom.hit_testing import border_box, element_from_point
 
@@ -315,12 +315,13 @@ class MouseInput:
         }
         if related is not None:
             options["relatedTarget"] = related
-        interface = event_class or ("PointerEvent" if event_type.startswith("pointer") else "MouseEvent")
+        interface = event_class or ("PointerEvent" if event_type.startswith("pointer") or event_type == "click" else "MouseEvent")
         if interface == "PointerEvent":
-            options.update({"pointerId": POINTER_ID, "pointerType": "mouse", "isPrimary": True})
+            options.update({"pointerId": POINTER_ID, "pointerType": "mouse",
+                            "isPrimary": event_type != "click", "pressure": 0.5 if self._bits else 0})
             if coalesced:
                 options["coalesced"] = tuple(coalesced)
-            if not event_type.endswith(("down", "up")):
+            if event_type.startswith("pointer") and not event_type.endswith(("down", "up")):
                 # No button transition is -1 on a pointer event; the mouse event
                 # beside it keeps the 0 Chromium gives it.
                 options["button"] = -1
@@ -448,9 +449,9 @@ class MouseInput:
             if button == "right":
                 self._emit("contextmenu", clicked, button=BUTTON_INDEX[button])
             return
+        prepared = prepare_activation(clicked)
         event = self._emit("click", clicked, detail=count)
-        if event is not None and not event.defaultPrevented:
-            run_activation(clicked, event)
+        complete_activation(clicked, event, prepared)
         if count == 2:
             self._emit("dblclick", clicked, detail=count)
 

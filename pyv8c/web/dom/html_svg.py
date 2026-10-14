@@ -7,17 +7,19 @@ reports the number as written, its unit, and -- for absolute units -- user units
 """
 
 import re
+import struct
+import math
 
 
 from ...idl import interface
 from ...foundation.arguments import dom_string, number
-from ..page_errors import NotSupportedError
+from ..page_errors import NotSupportedError, PageTypeError
 from .css import CSSStyleDeclaration
 from .css_typed import StylePropertyMap
 from .html_elements import Element
 
 __all__ = ["SVGAnimatedLength", "SVGElement", "SVGGeometryElement", "SVGGraphicsElement",
-           "SVGLength", "SVGRectElement"]
+           "SVGLength", "SVGRect", "SVGRectElement"]
 
 
 #: The unit types an SVGLength reports, named as the baseline names its constants.
@@ -92,6 +94,34 @@ class SVGElement(Element):
 @interface('SVGGraphicsElement', 'SVGElement')
 class SVGGraphicsElement(SVGElement):
     pass
+
+
+@interface('SVGRect', None)
+class SVGRect:
+    """The legacy four-float rectangle returned by SVG geometry APIs."""
+    def __init__(self, x=0, y=0, width=0, height=0, **_):
+        self.set_x(x);self.set_y(y);self.set_width(width);self.set_height(height)
+
+    @staticmethod
+    def _float(value, member):
+        value = float(number(value))
+        try:
+            converted = struct.unpack('f', struct.pack('f', value))[0]
+        except OverflowError:
+            converted = math.inf
+        if not math.isfinite(converted):
+            raise PageTypeError(f"Failed to set the '{member}' property on 'SVGRect': "
+                                "The provided float value is non-finite.")
+        return converted
+
+    def get_x(self): return self._x
+    def get_y(self): return self._y
+    def get_width(self): return self._width
+    def get_height(self): return self._height
+    def set_x(self, value): self._x = self._float(value, 'x')
+    def set_y(self, value): self._y = self._float(value, 'y')
+    def set_width(self, value): self._width = self._float(value, 'width')
+    def set_height(self, value): self._height = self._float(value, 'height')
 
 
 @interface('SVGGeometryElement', 'SVGGraphicsElement')

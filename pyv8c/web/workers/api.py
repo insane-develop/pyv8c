@@ -113,6 +113,15 @@ class WorkerGlobalScope(_SchedulingMixin, EventTarget):
                           initiator_url=self.script_url())
 
     def get_self(self): return self
+    def fn_atob(self, data=MISSING, *_extra):
+        from ..bom.window import base64_like
+        return base64_like("WorkerGlobalScope", "atob", data)
+    def fn_btoa(self, data=MISSING, *_extra):
+        from ..bom.window import base64_like
+        return base64_like("WorkerGlobalScope", "btoa", data)
+    def fn_structuredClone(self, value=MISSING, options=None, *_extra):
+        from ..fetch.clone import clone_api
+        return clone_api(self, "WorkerGlobalScope", value, options)
     def get_navigator(self): return self._values.value("navigator")
     def get_crypto(self): return self._values.value("crypto")
     def get_trustedTypes(self): return self._values.value("trustedTypes")

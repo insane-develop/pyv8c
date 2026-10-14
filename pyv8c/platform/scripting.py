@@ -93,6 +93,10 @@ class ScriptController:
         """
         if self._sandboxed("allow-scripts"):
             return False
+        if getattr(node, "_script_executed", False):
+            return True
+        # A script retains its execution state when moved, even if it threw.
+        node._script_executed = True
         document = self.page.document
         previous = document.current_script
         document.current_script = node
@@ -175,7 +179,8 @@ class ScriptController:
 
     def dynamic_script_updated(self, node):
         page = self.page
-        if page.closed or getattr(node, "_resource_started", False) and getattr(node, "_dynamic_started", False):
+        if page.closed or getattr(node, "_script_executed", False) or (
+                getattr(node, "_resource_started", False) and getattr(node, "_dynamic_started", False)):
             return
         if self._sandboxed("allow-scripts"):
             return

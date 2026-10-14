@@ -720,8 +720,9 @@ class HTMLInputElement(HTMLElement):
         kind = self.get_type()
         trusted = bool(getattr(event, "_trusted", False))
         if kind in ("checkbox", "radio"):
-            self._dirty_checked = True
-            self._checked = not self._checked if kind == "checkbox" else True
+            if getattr(event, "_activation_prepared", None) is not self:
+                self._dirty_checked = True
+                self._checked = not self._checked if kind == "checkbox" else True
             from .events import Event
             for event_type, bubbles in (("input", False), ("change", True)):
                 event = Event(event_type, {"bubbles": bubbles, "cancelable": False})

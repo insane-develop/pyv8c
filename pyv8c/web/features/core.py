@@ -180,7 +180,7 @@ FEATURE = FeatureImplementation(
         xpath.XPathEvaluator, xpath.XPathExpression, xpath.XPathResult,
         html_svg.SVGElement, html_svg.SVGGraphicsElement,
         html_svg.SVGGeometryElement, html_svg.SVGRectElement,
-        html_svg.SVGLength, html_svg.SVGAnimatedLength,
+        html_svg.SVGLength, html_svg.SVGAnimatedLength, html_svg.SVGRect,
     ),
     {
         "location": lambda owner: navigation.Location(services=owner._services),

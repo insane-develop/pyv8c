@@ -6,8 +6,8 @@ from urllib.parse import urlsplit
 import pyv8
 
 from ...idl import interface
-from ...foundation.arguments import MISSING, dom_string, is_nullish, missing_error, number
-from ..page_errors import InvalidCharacterError, SecurityError, PageTypeError, dom_exception
+from ...foundation.arguments import MISSING, boolean, dom_string, interface_value, is_nullish, missing_error, number
+from ..page_errors import InvalidCharacterError, NotSupportedError, SecurityError, PageTypeError, dom_exception
 from .animation import DocumentTimeline
 from .character_data import Comment, DocumentType, Text
 from .collections import HTMLAllCollection, HTMLCollection, NodeList, tag_name_ns_collection
@@ -16,7 +16,7 @@ from .fonts import FontFaceSet
 from .html_classes import class_for_local_name, class_for_tag, svg_interface_name
 from .html_elements import Element
 from .mixins import _ParentNodeMixin
-from .nodes import Attr, DocumentFragment, Node
+from .nodes import Attr, DocumentFragment, Node, ShadowRoot
 from .permissions_policy import PermissionsPolicy
 from .utils import MATHML_NAMESPACE, SVG_NAMESPACE, XHTML_NAMESPACE, _VALID_NAME_RE, name_fault
 
@@ -436,6 +436,29 @@ class Document(_ParentNodeMixin, Node):
         return Comment(str(value), services=self._services)
     def fn_createDocumentFragment(self, *_extra):
         return DocumentFragment(services=self._services)
+    def fn_importNode(self, node=MISSING, deep=False, *_extra):
+        """Copy a detached tree into this document, leaving the source untouched.
+
+        The destination services must be assigned before building the subtree: its
+        ownerDocument and any later insertion hooks belong to the importing document.
+        """
+        if node is MISSING:
+            raise missing_error('Document', 'importNode', 1, 0, constructor=False)
+        node = interface_value(node, 'Node', 'Document', 'importNode', 1, nullable=False)
+        if node.nodeType == Node.DOCUMENT_NODE or isinstance(node, ShadowRoot):
+            raise NotSupportedError("Failed to execute 'importNode' on 'Document': "
+                                    "The provided node cannot be imported.")
+        include_children = False if deep is pyv8.Undefined else boolean(deep)
+
+        def copy(source):
+            clone = source._clone_shallow()
+            clone._services = self._services
+            if include_children:
+                for child in source._children:
+                    clone.append_child(copy(child))
+            return clone
+
+        return copy(node)
     def fn_createNodeIterator(self, root=MISSING, what_to_show=None, filter=None, *_extra):
         """What the run walks: optional mask and filter, both defaulting to everything."""
         from .traversal import create_node_iterator
