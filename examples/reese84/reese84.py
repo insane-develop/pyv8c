@@ -12,15 +12,11 @@ sys.path[:0] = [str(WORKSPACE / '_pyv8'), str(WORKSPACE / 'pyv8c')]
 import pyv8
 from loguru import logger
 from pyv8c import Browser
-from pyv8c.web.bom.window import Window
 from pyv8c.web.dom.document import Document
-from pyv8c.web.dom.html_iframe import HTMLIFrameElement
-from pyv8c.web.page_errors import PageSyntaxError, PageTypeError, js_error_value
 
 KEYWORD = 'NORTHWEST'
 PROXY = None  # 需要代理时填写 'http://127.0.0.1:7890'
 TIMEOUT = 45
-OUTPUT = HERE / 'output'
 ORIGIN = 'https://orion.nv.gov'
 URL = ORIGIN + '/portal/public/#/public/nvsos/en/CaseXscreen?screen=external-GenericFilingsSearch&tabRoute=agent'
 SDK_PATH = '/sworthe-which-welcolmembling-those-That-th-edgem'
@@ -28,51 +24,18 @@ API_URL = ORIGIN + '/core/api/_q/v1/nv-sos/public/CRAEntities'
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
 
 
-def content_window(frame):
-    # 同源 iframe 必须返回子窗口原生 handle，避免定时器接收者错误。
-    child = frame._child_services
-    parent = Window._accessor_window(frame._services.document_services.window)
-    if child is not None and parent._origin == child._origin:
-        return child._page_realm.context.js_obj(child.window)
-    return HTMLIFrameElement.get_contentWindow(self=frame)
+def interface_overrides(cookie_observer):
+    def set_cookie(document, value):
+        Document.set_cookie(document, value)
+        cookie_observer(document, value)
+    return {'Document': {'cookie': {'set': set_cookie}}}
 
 
-def json_nulls(value):
-    # Python None 会被 native binding 转为 undefined，保留 JSON null 的原义。
-    if value is None:
-        return pyv8.Null
-    if isinstance(value, list):
-        return [json_nulls(item) for item in value]
-    if isinstance(value, dict):
-        return {key: json_nulls(item) for key, item in value.items()}
-    return value
-
-
-def response_json(response, *_):
-    def parse():
-        text = response._body_value()
-        try:
-            return json_nulls(json.loads(text))
-        except json.JSONDecodeError as exc:
-            raise PageSyntaxError(f'Unexpected token in JSON at position {exc.pos}') from exc
-    if response._services is None:
-        return parse()
-    promise, resolve, reject = response._services.realm_services.make_promise()
-    try:
-        resolve(parse())
-    except (PageTypeError, PageSyntaxError, pyv8.JSException) as exc:
-        reject(js_error_value(exc))
-    return promise
-
-
-def interface_overrides(cookie_observer=None):
-    hooks = {'HTMLIFrameElement': {'contentWindow': content_window}, 'Response': {'json': response_json}}
-    if cookie_observer:
-        def set_cookie(document, value):
-            Document.set_cookie(document, value)
-            cookie_observer(document, value)
-        hooks['Document'] = {'cookie': {'set': set_cookie}}
-    return hooks
+def challenge_document(body):
+    scripts = re.findall(r'''<script\b[^>]*\bsrc=["'][^"']*(?:sworthe-which-welcolmembling-those-That-th-edgem|_Incapsula_Resource\?SWJIYLWA=)[^"']*["'][^>]*>\s*</script>''', body, re.I)
+    if not scripts:
+        raise RuntimeError('No recognized challenge script in the current document.')
+    return '<!doctype html><html><head><title>NV-SOS Case Management</title>' + ''.join(scripts) + '</head><body></body></html>'
 
 
 def search_body():
@@ -88,8 +51,6 @@ def search_body():
 def main():
     logger.remove()
     logger.add(sys.stderr, level='INFO', format='{time:HH:mm:ss} | {level} | {message}')
-    logger.add(OUTPUT / 'reese84.log', level='INFO', mode='w', encoding='utf-8',
-               format='{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}')
     cookies, posts, documents, stopped = {}, 0, 0, False
     deadline = time.monotonic() + TIMEOUT
 
@@ -126,10 +87,7 @@ def main():
         logger.info('{} {} -> {}', method, url, response.status)
         body = response.text
         if parsed.path == '/portal/public/':
-            scripts = re.findall(r'''<script\b[^>]*\bsrc=["'][^"']*(?:sworthe-which-welcolmembling-those-That-th-edgem|_Incapsula_Resource\?SWJIYLWA=)[^"']*["'][^>]*>\s*</script>''', body, re.I)
-            if not scripts:
-                raise RuntimeError('No recognized challenge script in the current document.')
-            body = '<!doctype html><html><head><title>NV-SOS Case Management</title>' + ''.join(scripts) + '</head><body></body></html>'
+            body = challenge_document(body)
         return {'status': response.status, 'statusText': response.status_text, 'body': body, 'headers': response.headers}
 
     browser = Browser(
@@ -149,7 +107,11 @@ def main():
         else:
             raise RuntimeError('Timed out waiting for a fresh reese84 cookie.')
         response = page.net.post(API_URL, json=search_body(), timeout=20)
-        data = response.json()
+        logger.info('CRAEntities HTTP {}', response.status)
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            raise RuntimeError(f'CRAEntities returned non-JSON content: HTTP {response.status}.') from None
         if response.status != 200 or not isinstance(data, dict) or data.get('code') != 0 or not isinstance(data.get('items'), list):
             raise RuntimeError(f'CRAEntities failed: HTTP {response.status}.')
         if any(not str(item.get('agentname', '')).upper().startswith(KEYWORD.upper()) for item in data['items']):
@@ -167,4 +129,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

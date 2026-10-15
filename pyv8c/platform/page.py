@@ -293,7 +293,7 @@ class Page:
             window._features._cache(slot, previous_window._features.value(slot))
         self.window = window
         self.services.window = window
-        self.realm = PageRealm(self, executor=self.executor)
+        self.realm = PageRealm(self, executor=self.executor, previous_context=previous_realm.context)
         self.services.bind_realm(self.realm)
         self.realm.executor.attach_task_queue(self.tasks)
         self.realm.executor.attach_rejection_tracker(self.rejections)

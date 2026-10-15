@@ -13,12 +13,10 @@ import pyv8
 from loguru import logger
 from pyv8c import Browser
 from pyv8c.platform import input as mouse_input
-from pyv8c.web.bom.window import Window
 from pyv8c.web.dom import hit_testing, layout
 from pyv8c.web.dom.html_elements import HTMLElement
-from pyv8c.web.dom.html_iframe import HTMLIFrameElement
 
-PHONES = [f'134037{i}365' for i in range(10,100)]
+PHONE = '13403705387'
 PROXY = None
 TIMEOUT = 60
 SLIDE_WIDTH, SLIDE_HEIGHT = 342, 31
@@ -39,16 +37,6 @@ window.addEventListener('unhandledrejection',e=>__errors.push(String(e.reason)))
 initAliyunCaptcha(Object.assign(''' + json.dumps(CONFIG) + ''',{
  captchaVerifyCallback:value=>{globalThis.__captchaParam=value;},getInstance:value=>{globalThis.__captcha=value;}
 }));</script></body></html>'''
-
-
-def get_phone():
-    return random.choice(PHONES)
-def content_window(frame):
-    child=frame._child_services
-    parent=Window._accessor_window(frame._services.document_services.window)
-    if child is not None and child._origin==parent._origin:
-        return child._page_realm.context.js_obj(child.window)
-    return HTMLIFrameElement.get_contentWindow(frame)
 
 
 def font_span_size(element,axis):
@@ -156,21 +144,14 @@ def main():
         if action:actions.append(action)
         logger.info('{} {} {} -> {}',method,action,url,response.status)
         text=response.text
-        if parts.path.endswith('/AliyunCaptcha.js'):
-            # 框架异步创建 iframe，等待其 contentWindow 可用再检查 readyState。
-            needle='var u=function(){n||("complete"===i.contentWindow.document.readyState?o():K()(u,10))};u()'
-            if text.count(needle)!=1:raise RuntimeError('AliyunCaptcha bootstrap changed; recheck iframe compatibility.')
-            text=text.replace(needle,'var u=function(){if(!i.contentWindow)return K()(u,10);n||("complete"===i.contentWindow.document.readyState?o():K()(u,10))};u()')
         return {'status':response.status,'body':text,'headers':response.headers}
 
     browser=Browser(resource_interceptor=intercept,cache=False,proxy=PROXY,
                     http_options={'impersonate':'chrome150','timeout':20},
-                    interface_overrides={'HTMLIFrameElement':{'contentWindow':content_window},
-                                         'HTMLElement':{'offsetWidth':offset_width,'offsetHeight':offset_height}},
+                    interface_overrides={'HTMLElement':{'offsetWidth':offset_width,'offsetHeight':offset_height}},
                     environment={'user_agent':USER_AGENT,'languages':['zh-CN','zh']})
     page=browser.new_context().new_page()
     try:
-        PHONE=get_phone()
         page.goto(URL)
         while time.monotonic()<deadline:
             state=page.evaluate("({ready:!!document.getElementById('aliyunCaptcha-sliding-slider'),errors:__errors})")

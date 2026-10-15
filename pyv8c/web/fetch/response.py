@@ -12,6 +12,18 @@ from .blob import Blob
 from .headers import Headers
 
 
+def _json_nulls(value):
+    # None crosses the native bridge as undefined; JSON null must stay null,
+    # including inside objects and arrays settled through a Promise resolver.
+    if value is None:
+        return pyv8.Null
+    if isinstance(value, list):
+        return [_json_nulls(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _json_nulls(item) for key, item in value.items()}
+    return value
+
+
 @interface('Response', None)
 class Response:
 
@@ -104,7 +116,7 @@ class Response:
                 raise PageSyntaxError(
                     f"Unexpected token in JSON at position {getattr(exc, 'pos', 0)}"
                 ) from exc
-            resolve(value)
+            resolve(_json_nulls(value))
         except (PageTypeError, PageSyntaxError, pyv8.JSException, UnicodeError, IdlArgumentError) as exc:
             reject(js_error_value(exc))
         return promise

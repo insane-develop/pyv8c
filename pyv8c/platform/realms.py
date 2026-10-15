@@ -157,9 +157,10 @@ class WorkerRealm:
 class PageRealm:
     """Own the V8 context and binding session for one page."""
 
-    def __init__(self, page, executor=None):
+    def __init__(self, page, executor=None, previous_context=None):
         self.page = page
         self.context = None
+        self._previous_context = previous_context
         self.executor = executor if executor is not None else RealmExecutor(name="pyv8c-page")
         #: False when the page owns the thread and hands it across navigations.
         self._owns_executor = executor is None
@@ -188,13 +189,14 @@ class PageRealm:
         binding_prepared = time.perf_counter_ns()
         #: A frame's realm is not the top page's: the label says which it is.
         context_type = "FRAME" if page.parent_page is not None else "TOP"
-        self.context = pyv8.Context(page.window, **_context_kwargs(
+        self.context = pyv8.Context(page.window, _reuse_global_from=self._previous_context, **_context_kwargs(
             self.binding_session, context_type, page.trace,
             exposure_type="Window",
             on_materialize=self._record_deferred_materialized,
             trace_callback=page.context_owner.trace_callback,
             traceable=page.context_owner.traceable,
         ))
+        self._previous_context = None
         self.executor.attach_deadline_source(self.context)
         context_created = time.perf_counter_ns()
         deferred_globals = _declare_realm_interfaces(

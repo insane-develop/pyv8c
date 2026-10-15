@@ -1120,11 +1120,7 @@ class ResourceController:
         return "opaque", object()
 
     def ensure_iframe_context(self, iframe):
-        """The context an inserted frame gets, on the task after its insertion.
-
-        A browser builds it while inserting the element; building a realm is not
-        reentrant with a running script here, so it happens on the next task.
-        """
+        """Expose the initial browsing context during insertion; navigate later."""
         if getattr(iframe, "_child_services", None) is not None:
             return iframe._child_services
         markup = iframe.attributes.get("srcdoc")
@@ -1144,6 +1140,9 @@ class ResourceController:
         if iframe.get_src() or "srcdoc" in iframe.attributes:
             return child
         child.set_content("", url="about:blank")
+        # The initial empty document is already complete when insertion returns.
+        # Its queued parser task is idempotent after these load steps finish.
+        child.lifecycle.maybe_fire_dom_content_loaded()
         child.lifecycle.when_loaded(lambda ok: page.tasks.post(
             lambda: self.dispatch_frame_completion(iframe, ok)))
         return child

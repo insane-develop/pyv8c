@@ -587,7 +587,7 @@ class Binder:
             enabled.add("__v8_cross_origin_check__")
         handler_names = [
             callback for _, mapping in HANDLER_FAMILIES + CROSS_ORIGIN_FAMILIES for _, callback in mapping
-        ] + ["__v8_cross_origin_check__"]
+        ] + ["__v8_cross_origin_check__", "__v8_cross_origin_denied__"]
         options = {}
         declarations = tuple(stated_fields(base) for base in cls.__mro__)
         for callback_name in handler_names:

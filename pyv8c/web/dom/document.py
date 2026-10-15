@@ -259,7 +259,7 @@ class Document(_ParentNodeMixin, Node):
     def get_location(self):
         """The document's ``Location``: the object ``window.location`` is."""
         window = self._browsing_window()
-        return pyv8.Null if window is None else window.location
+        return pyv8.Null if window is None else window.get_location()
     def set_location(self, value):
         """Assigning to it assigns ``location.href``; without a window it throws."""
         window = self._browsing_window()

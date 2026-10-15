@@ -1,8 +1,4 @@
-"""Window and the named-properties prototype it inherits.
-
-Cross-origin access goes through :mod:`dom.window_proxy`, imported by
-:meth:`Window._view` on first use.
-"""
+"""Window, its named-properties prototype and native cross-origin policy hooks."""
 import pyv8
 
 
@@ -131,9 +127,10 @@ class WindowProperties(EventTarget):
         if not matches:
             return None
         if len(matches) == 1:
-            return matches[0]
+            return self._services.realm_services.object_handle(matches[0])
         from ..dom.collections import HTMLCollection
-        return HTMLCollection(owner=document, getter=lambda: self._named_elements(name))
+        collection = HTMLCollection(owner=document, getter=lambda: self._named_elements(name))
+        return self._services.realm_services.object_handle(collection)
 
     def __v8_property_name_query__(self, name):
         return 0 if self.__v8_property_name_get__(name) is not None else None
@@ -296,6 +293,7 @@ class Window(_SchedulingMixin, WindowProperties):
             #: A window is the global object itself, which its own ``self`` reads back.
             "global_this": True,
             "cross_origin_check": "__v8_cross_origin_check__",
+            "cross_origin_denied": "__v8_cross_origin_denied__",
             "cross_origin_index_del": "__v8_cross_origin_index_del__",
             "cross_origin_index_get": "__v8_cross_origin_index_get__",
             "cross_origin_index_set": "__v8_cross_origin_index_set__",
@@ -371,11 +369,14 @@ class Window(_SchedulingMixin, WindowProperties):
     def __v8_cross_origin_check__(self, accessor):
         return accessor is self or getattr(accessor, "_origin", None) == self._origin
 
+    def __v8_cross_origin_denied__(self):
+        deny_cross_origin()
+
     def _cross_origin_proxy(self):
         entry = self._context_origins.get(id(pyv8.current_context()))
         if entry is None:
             raise SecurityError("The accessing Window is not available")
-        return entry[0]._view(self)
+        return entry[0]._proxy_for(self)
 
     def __v8_cross_origin_name_get__(self, name):
         proxy = self._cross_origin_proxy()
@@ -408,6 +409,7 @@ class Window(_SchedulingMixin, WindowProperties):
     @classmethod
     def _bind_context(cls, context, window):
         cls._context_origins[id(context)] = (window, window._origin)
+        window._ctx = context
 
     @classmethod
     def _unbind_context(cls, context):
@@ -446,6 +448,9 @@ class Window(_SchedulingMixin, WindowProperties):
     def _view(self, target):
         if target is self:
             return self
+        return target._services.realm_services.window_handle()
+
+    def _proxy_for(self, target):
         # One proxy per browsing context, not per Window: a navigation replaces
         # the Window while the reference a page holds stays the same object.
         frame = getattr(target, "_frame_element", None)
@@ -492,7 +497,14 @@ class Window(_SchedulingMixin, WindowProperties):
             value = event_handler(value)
         self._require_same_origin()
         self._set_handler('onmessage', value)
-    def get_location(self): return self.location
+    def get_location(self):
+        # A caller may retain this reference after the child realm navigates.
+        # Keep its host binding in the incumbent realm, as the former facade did.
+        context = pyv8.incumbent_context()
+        if context is None:
+            return self.location
+        context.to_js(self.location)
+        return context.js_obj(self.location)
     def set_location(self, value): self.location.set_href(value)
     def get_navigator(self): self._require_same_origin(); return self.navigator
     def get_clientInformation(self): self._require_same_origin(); return self.navigator

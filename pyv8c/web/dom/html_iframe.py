@@ -199,7 +199,7 @@ class HTMLIFrameElement(HTMLElement):
         accessor = Window._accessor_window(self._services.document_services.window)
         if accessor._origin != self._child_services._origin:
             return pyv8.Null
-        return self._child_services.document_services.document
+        return self._child_services.realm_services.document_handle()
     def get_contentWindow(self):
         if self._child_services is None:
             return pyv8.Null

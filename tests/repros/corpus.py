@@ -375,6 +375,66 @@ CASES = (
         script="JSON.stringify({a: [1, 2], b: 'x'})",
         expected='{"a":[1,2],"b":"x"}',
     ),
+    Repro(
+        name="response_json_preserves_root_and_nested_null",
+        html=page(body="""<script>
+            globalThis.jsonResult = 'pending';
+            Promise.all([
+                new Response('null').json(),
+                new Response('{"a":null,"b":[null,{"c":null}]}').json()
+            ]).then(([root, value]) => {
+                jsonResult = [root === null, value.a === null,
+                              value.b[0] === null, value.b[1].c === null];
+            });
+        </script>"""),
+        script="jsonResult",
+        expected=[True] * 4,
+        settle=0.05,
+    ),
+    Repro(
+        name="script_inserted_iframe_exposes_initial_window_synchronously",
+        html=page(body="""<script>
+            const frame = document.createElement('iframe');
+            globalThis.frameResult = [frame.contentWindow === null];
+            document.body.appendChild(frame);
+            frameResult.push(frame.contentWindow !== null,
+                             frame.contentDocument.readyState === 'complete');
+        </script>"""),
+        script="frameResult",
+        expected=[True] * 3,
+    ),
+    Repro(
+        name="same_origin_frame_window_methods_keep_receiver_and_identity",
+        html=page(body='<iframe id="frame"></iframe>'),
+        script="""(() => {
+            const w = document.getElementById('frame').contentWindow;
+            const timer = w.setTimeout;
+            let wrongReceiver = false;
+            try { timer.call({}, () => {}, 0); }
+            catch (error) { wrongReceiver = error instanceof TypeError || error.name === 'TypeError'; }
+            return [typeof w.setTimeout(() => {}, 0),
+                    typeof timer.call(w, () => {}, 0), timer === w.setTimeout,
+                    timer.name, timer.length, wrongReceiver,
+                    w === window[0], w.self === w];
+        })()""",
+        expected=['number', 'number', True, 'setTimeout', 1, True, True, True],
+    ),
+    Repro(
+        name="iframe_window_has_its_own_realm_and_document_identity",
+        html=page(body='<iframe id="frame"></iframe>'),
+        script="""(() => {
+            const frame = document.getElementById('frame');
+            const w = frame.contentWindow;
+            return [Object.getPrototypeOf(w) === w.Window.prototype,
+                    w.Object !== Object, w.Array !== Array,
+                    frame.contentDocument === w.document,
+                    w.document.defaultView === w,
+                    w.eval('window') === w,
+                    w.Function('return this')() === w,
+                    Object.getOwnPropertyDescriptor(w, 'setTimeout').value === w.setTimeout];
+        })()""",
+        expected=[True] * 8,
+    ),
     # -- events ----------------------------------------------------------------
     Repro(
         name="event_listener_order_is_capture_then_target_then_bubble",

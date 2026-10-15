@@ -39,7 +39,7 @@ MEMBER_FIELDS = ("callback", "getter", "setter", "length", "side_effect", "locat
 #: What a class may state about the interface itself, keyed as the native builder spells them.
 INTERFACE_FIELDS = (
     "array", "call", "code_like", "constants_value", "constructor_adapter",
-    "constructor_behavior", "cross_origin_check", "cross_origin_index_del",
+    "constructor_behavior", "cross_origin_check", "cross_origin_denied", "cross_origin_index_del",
     "cross_origin_index_enum", "cross_origin_index_get", "cross_origin_index_query",
     "cross_origin_index_set", "cross_origin_name_del", "cross_origin_name_enum",
     "cross_origin_name_get", "cross_origin_name_query", "cross_origin_name_set",

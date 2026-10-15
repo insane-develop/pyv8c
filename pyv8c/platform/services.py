@@ -192,6 +192,21 @@ class _RealmCapability(_TaskSource):
     def interface_materialized(self, name):
         return name in self._owner._page_realm.binding_session.materialized_interfaces
 
+    def window_handle(self):
+        """The browsing context's native global proxy, shared across navigations."""
+        realm = self._owner._page_realm
+        return realm.context.js_obj(self._owner.window)
+
+    def document_handle(self):
+        """Return the document in the same realm as its Window."""
+        return self.object_handle(self._owner.document_services.document)
+
+    def object_handle(self, value):
+        """Materialize a host object in its owning realm before lending it out."""
+        realm = self._owner._page_realm
+        realm.context.to_js(value)
+        return realm.context.js_obj(value)
+
     def window_property(self, operation, name, value=None):
         """Operate on a same-origin Window in its owning realm."""
         realm = self._owner._page_realm
@@ -417,14 +432,10 @@ class _DocumentCapability:
         if getattr(node, "localName", "") == "iframe":
             if not node._is_connected():
                 return None
-            # An inserted frame gets its own context.  Built while a script runs, the realm is
-            # queued instead: entering another realm re-enters this executor.
+            # PageRealm initializes inline when a script is active.  Insertion
+            # must expose about:blank before that script reads contentWindow.
             services = self._owner._resources
-            page = services.page
-            if page.document.current_script is None:
-                services.ensure_iframe_context(node)
-            else:
-                page.tasks.post(lambda: services.ensure_iframe_context(node))
+            services.ensure_iframe_context(node)
             if (node.get_src()
                     and not getattr(node, "_resource_started", False)):
                 services.discover_element_resource(node)

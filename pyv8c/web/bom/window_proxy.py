@@ -1,8 +1,7 @@
-"""Cross-origin access to another browsing context's ``Window``.
+"""Policy handlers for access to another browsing context's ``Window``.
 
-A child ``Window`` is a global owned by its own V8 Context, so every cross-origin
-reference goes through :class:`WindowProxy`, a native-backed facade that keeps
-identity stable while exposing only the safe cross-origin surface.
+JavaScript receives V8's native global proxy. These Python handlers answer the
+restricted surface when its native access check denies a cross-origin caller.
 """
 
 import pyv8
@@ -79,7 +78,7 @@ class _CrossOriginLocation:
 
 
 class WindowProxy:
-    """Stable parent-realm facade for a cross-origin iframe Window."""
+    """Resolve a live frame's permitted cross-origin operations."""
 
     #: As with the restricted location, the document carries nothing of this facade, so the
     #: class states its whole surface: the safe names, the frame slots, and their controls.
@@ -201,9 +200,9 @@ class WindowProxy:
     def __v8_index_set__(self, index, value): deny_cross_origin()
     def __v8_index_del__(self, index): deny_cross_origin()
 
-    def get_window(self): return self
-    def get_self(self): return self
-    def get_frames(self): return self
+    def get_window(self): return self._accessor()._view(self._child_window)
+    def get_self(self): return self.get_window()
+    def get_frames(self): return self.get_window()
     def get_top(self): return self._accessor()._view(self._child_window._top_target())
     def get_parent(self): return self._accessor()._view(self._child_window._parent_target())
     def get_opener(self): return pyv8.Null
